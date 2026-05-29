@@ -20,11 +20,11 @@ def _validate_doi(doi: str) -> bool:
 
 
 class DatabaseStoragePipeline:
-    def open_spider(self, spider):
+    def open_spider(self):
         self.session = SessionLocal()
         self._cache_invalidated = False
 
-    def close_spider(self, spider):
+    def close_spider(self):
         try:
             self.session.close()
         except Exception:
@@ -152,20 +152,36 @@ class DatabaseStoragePipeline:
                 print(f"URAAS_DOWNLOAD: [Title encoding error]", flush=True)
 
             # Create Authors
-            authors = item.get('authors', [])
-            for author_name in authors:
+            authors_full = item.get('authors_full', [])
+            if not authors_full:
+                # Fallback to simple list if authors_full is missing
+                for a in item.get('authors', []):
+                    authors_full.append({'name': a, 'orcid': '', 'ror': ''})
+
+            for auth in authors_full:
+                author_name = auth.get('name', '')
                 try:
                     if not author_name or not isinstance(author_name, str):
                         continue
                     author_obj = self.session.query(Author).filter_by(
                         normalized_name=author_name.lower().strip()
                     ).first()
+                    
                     if not author_obj:
                         author_obj = Author(
                             name=author_name,
-                            normalized_name=author_name.lower().strip()
+                            normalized_name=author_name.lower().strip(),
+                            orcid=auth.get('orcid', ''),
+                            ror=auth.get('ror', '')
                         )
                         self.session.add(author_obj)
+                    else:
+                        # Update missing IDs if they are newly discovered
+                        if auth.get('orcid') and not author_obj.orcid:
+                            author_obj.orcid = auth['orcid']
+                        if auth.get('ror') and not author_obj.ror:
+                            author_obj.ror = auth['ror']
+
                     doc.authors.append(author_obj)
                 except Exception as e:
                     spider.logger.error(f"Error processing author '{author_name}': {e}")

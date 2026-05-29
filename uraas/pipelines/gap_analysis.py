@@ -12,7 +12,7 @@ class GapAnalysisPipeline:
     2. If no DOI, fuzzy-compare normalized title via Levenshtein distance.
        If similarity >= 95% → drop as duplicate.
     """
-    def open_spider(self, spider):
+    def open_spider(self):
         self.session = SessionLocal()
         # Cache existing normalized titles for fast in-memory fuzzy comparison
         self._cached_titles = [
@@ -21,7 +21,7 @@ class GapAnalysisPipeline:
             if r[0]
         ]
 
-    def close_spider(self, spider):
+    def close_spider(self):
         try:
             self.session.close()
         except Exception:
